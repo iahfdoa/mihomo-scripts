@@ -15,10 +15,10 @@
 📌 **一键安装命令** (复制以下命令使用`root`直接运行):
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/iahfdoa/mihomo-scripts/main/install.sh)
+bash <(curl -fsSL https://github.com/iahfdoa/mihomo-scripts/releases/latest/download/install.sh)
 ```
 📌 **一键卸载命令** (复制以下命令使用`root`直接运行):
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/iahfdoa/mihomo-scripts/main/unintall.sh)
+bash <(curl -fsSL https://github.com/iahfdoa/mihomo-scripts/releases/latest/download/unintall.sh)
 ```
