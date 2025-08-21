@@ -20,5 +20,5 @@ bash <(curl -fsSL https://github.com/iahfdoa/mihomo-scripts/releases/latest/down
 📌 **一键卸载命令** (复制以下命令使用`root`直接运行):
 
 ```bash
-bash <(curl -fsSL https://github.com/iahfdoa/mihomo-scripts/releases/latest/download/unintall.sh)
+bash <(curl -fsSL https://github.com/iahfdoa/mihomo-scripts/releases/latest/download/uninstall.sh)
 ```
