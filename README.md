@@ -14,7 +14,7 @@
 <a href="https://github.com/iahfdoa/mihomo-scripts"><img src="https://img.shields.io/github/last-commit/iahfdoa/mihomo-scripts" alt=""></a> 
 </p>
 
-**无需任何提前准备，只需要一台公网IP的`linux vps`即可快速安装**
+**无需任何提前准备，懒人必备，只需要一台公网IP的`linux vps`即可快速安装**
 
 ## 🌐 项目主页
 
