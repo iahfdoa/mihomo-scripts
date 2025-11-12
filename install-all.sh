@@ -128,7 +128,11 @@ if ! command -v mihomo &>/dev/null; then
 
     # 拼接下载 URL
     # 优先选择 v1/v2/v3，对应 CPU 兼容性
-    FILE_NAME="mihomo-linux-${BIN_ARCH}-${LEVEL}-${LATEST_VERSION}.gz"
+    if [ "$BIN_ARCH" = "amd64" ]; then
+      FILE_NAME="mihomo-linux-${BIN_ARCH}-${LEVEL}-${LATEST_VERSION}.gz"
+    else
+      FILE_NAME="mihomo-linux-${BIN_ARCH}-${LATEST_VERSION}.gz"
+    fi
     DOWNLOAD_URL="https://github.com/MetaCubeX/mihomo/releases/download/${LATEST_VERSION}/${FILE_NAME}"
 
     echo "📦 下载 ${FILE_NAME} ..."
