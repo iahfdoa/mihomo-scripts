@@ -20,11 +20,15 @@ jobs:
             echo "❌ install.sh not found"
             exit 1
           fi
+          if [ ! -f "install-all.sh" ]; then
+            echo "❌ install-all.sh not found"
+            exit 1
+          fi
           if [ ! -f "uninstall.sh" ]; then
             echo "❌ uninstall.sh not found"
             exit 1
           fi
-          chmod +x install.sh uninstall.sh
+          chmod +x install.sh uninstall.sh install-all.sh
           echo "✅ Scripts verified and made executable"
 
       - name: Create Release with scripts
@@ -35,6 +39,7 @@ jobs:
           generate_release_notes: true
           files: |
             install.sh
+            install-all.sh
             uninstall.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
