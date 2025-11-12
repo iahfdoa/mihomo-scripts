@@ -8,25 +8,52 @@ set -e
 # 检查依赖
 install_dependencies() {
     echo "🔧 检查并安装依赖..."
-    local pkgs=(curl openssl wget gzip)
+    # 基本依赖
+    local base_pkgs=(curl openssl wget gzip)
+
+    # 默认要安装的 uuidgen 包名（按不同包管理器设置）
+    local uuid_pkg=""
+    local extra_pkgs=()
+
     if command -v apt &>/dev/null; then
+        uuid_pkg="uuid-runtime"
+        # apt 安装前刷新索引
         apt update -y
-        apt install -y "${pkgs[@]}"
+        apt install -y "${base_pkgs[@]}" "$uuid_pkg"
     elif command -v yum &>/dev/null; then
-        yum install -y "${pkgs[@]}" tar || true
+        # yum/centos/rhel: util-linux 包含 uuidgen；保留 tar 兼容
+        uuid_pkg="util-linux"
+        extra_pkgs=(tar)
+        yum install -y "${base_pkgs[@]}" "$uuid_pkg" "${extra_pkgs[@]}" || true
     elif command -v dnf &>/dev/null; then
-        dnf install -y "${pkgs[@]}"
+        uuid_pkg="util-linux"
+        dnf install -y "${base_pkgs[@]}" "$uuid_pkg"
     elif command -v pacman &>/dev/null; then
-        pacman -Sy --noconfirm "${pkgs[@]}"
+        uuid_pkg="util-linux"
+        # pacman 需要同步更新数据库
+        pacman -Sy --noconfirm "${base_pkgs[@]}" "$uuid_pkg"
     elif command -v apk &>/dev/null; then
-        apk add --no-cache "${pkgs[@]}"
+        # Alpine 一般用 util-linux（在部分镜像/版本可能不同）
+        uuid_pkg="util-linux"
+        apk add --no-cache "${base_pkgs[@]}" "$uuid_pkg"
     else
-        echo "❌ 无法识别包管理器，请手动安装 curl openssl wget gzip"
+        echo "❌ 无法识别包管理器，请手动安装: curl openssl wget gzip 和 uuidgen 提供包（例如 uuid-runtime 或 util-linux）"
         exit 1
+    fi
+
+    # 最后再校验 uuidgen 是否可用，如果仍不可用提示用户
+    if ! command -v uuidgen &>/dev/null; then
+        echo "⚠️ 安装完成，但系统仍未找到 uuidgen。尝试以下替代方案："
+        echo "  • 在 Debian/Ubuntu 上：sudo apt install uuid-runtime"
+        echo "  • 在 RHEL/CentOS/Fedora/Arch/Alpine 上：sudo yum/dnf/pacman/apk install util-linux"
+        echo "  • 或在脚本中使用 python3 -c 'import uuid; print(uuid.uuid4())' 作为回退"
+        # 不直接 exit，以便脚本可以继续（按原来逻辑可调整为 exit 1）
+    else
+        echo "✅ 依赖安装完成，uuidgen 可用。"
     fi
 }
 
-for cmd in curl wget gzip openssl; do
+for cmd in curl wget gzip openssl uuidgen; do
     if ! command -v "$cmd" &>/dev/null; then
         install_dependencies
         break
