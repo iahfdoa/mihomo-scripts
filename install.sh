@@ -200,14 +200,37 @@ systemctl enable --now mihomo.service || {
 }
 
 PUBLIC_IP=$(curl -s ifconfig.me || echo "你的公网IP")
-echo -e "\n✅ 安装成功！"
-echo "--------------------------------------------"
-echo "Hysteria2 配置:"
-echo "- server: $PUBLIC_IP:$HY2_PORT"
-echo "- password: $HY2_PASSWORD"
-echo
-echo "AnyTLS 配置:"
-echo "- server: $PUBLIC_IP:$ANYTLS_PORT"
-echo "- password: $ANYTLS_PASSWORD"
-echo "--------------------------------------------"
+# 输出客户端配置
+echo -e "\n\n新的客户端配置信息："
+echo "=============================================="
+echo "1. Hysteria2 客户端配置:"
+echo -e "\n- name: $PUBLIC_IP｜Direct｜hy2"
+echo "  type: hysteria2"
+echo "  server: $PUBLIC_IP"
+echo "  port: $HY2_PORT"
+echo "  password: '$HY2_PASSWORD'"
+echo "  udp: true"
+echo "  sni: bing.com"
+echo "  skip-cert-verify: true"
+
+echo -e "\n2. AnyTLS 客户端配置:"
+echo -e "\n- name: $PUBLIC_IP｜Direct｜anytls"
+echo "  server: $PUBLIC_IP"
+echo "  type: anytls"
+echo "  port: $ANYTLS_PORT"
+echo "  password: $ANYTLS_PASSWORD"
+echo "  skip-cert-verify: true"
+echo "  sni: www.usavps.com"
+echo "  udp: true"
+echo "  tfo: true"
+echo "  tls: true"
+echo "  client-fingerprint: chrome"
+echo "=============================================="
+
+echo "hysteria2://$HY2_PASSWORD@$PUBLIC_IP:$HY2_PORT?peer=bing.com&insecure=1#$PUBLIC_IP｜Direct｜hy2"
+
+echo "anytls://$ANYTLS_PASSWORD@$PUBLIC_IP:$ANYTLS_PORT?peer=www.usavps.com&insecure=1&fastopen=1&udp=1#$PUBLIC_IP｜Direct｜anytls"
+
+echo -e "\n服务状态:"
 systemctl status mihomo --no-pager -l
+
