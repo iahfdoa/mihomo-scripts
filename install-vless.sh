@@ -13,15 +13,6 @@ random_free_port() {
     done
 }
 
-
-
-
-# ==========
-# Mihomo 一键安装脚本（自动选择合适架构）
-# ==========
-
-
-
 # 检查依赖
 install_dependencies() {
     echo "🔧 检查并安装依赖..."
@@ -77,32 +68,18 @@ for cmd in curl wget gzip openssl uuidgen; do
     fi
 done
 
-# ==========
-# 检测系统架构
-# ==========
 ARCH=$(uname -m)
 case "$ARCH" in
-    x86_64)
-        BIN_ARCH="amd64"
-        ;;
-    aarch64)
-        BIN_ARCH="arm64"
-        ;;
-    armv7l)
-        BIN_ARCH="armv7"
-        ;;
-    armv6l)
-        BIN_ARCH="armv6"
-        ;;
+    x86_64) BIN_ARCH="amd64" ;;
+    aarch64) BIN_ARCH="arm64" ;;
+    armv7l) BIN_ARCH="armv7" ;;
+    armv6l) BIN_ARCH="armv6" ;;
     *)
-        echo "❌ 不支持的架构: $ARCH"
+        echo "[-] 不支持的架构: $ARCH"
         exit 1
         ;;
 esac
 
-# ==========
-# 检测 CPU 指令集 (决定 v1/v2/v3)
-# ==========
 CPU_FLAGS=$(grep flags /proc/cpuinfo | head -n1)
 if [[ $CPU_FLAGS =~ avx2 ]]; then
     LEVEL="v3"
@@ -111,37 +88,31 @@ elif [[ $CPU_FLAGS =~ avx ]]; then
 else
     LEVEL="v1"
 fi
-echo "🧠 检测到 CPU 架构: $ARCH, 指令集等级: $LEVEL"
 
-# ==========
-# 下载并安装 Mihomo
-# ==========
+echo "[+] 检测到 架构=$ARCH 可执行=$BIN_ARCH 指令集等级=$LEVEL"
+
 if ! command -v mihomo &>/dev/null; then
-    echo "⬇️  正在安装 mihomo ..."
-
-    # 获取最新版本号
+    echo "[+] 正在安装 mihomo..."
     LATEST_VERSION=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     if [ -z "$LATEST_VERSION" ]; then
-        echo "❌ 获取版本号失败"
+        echo "[-] 无法获取最新版本号。"
         exit 1
     fi
 
-    # 拼接下载 URL
-    # 优先选择 v1/v2/v3，对应 CPU 兼容性
     if [ "$BIN_ARCH" = "amd64" ]; then
-      FILE_NAME="mihomo-linux-${BIN_ARCH}-${LEVEL}-${LATEST_VERSION}.gz"
+        FILE_NAME="mihomo-linux-${BIN_ARCH}-${LEVEL}-${LATEST_VERSION}.gz"
     else
-      FILE_NAME="mihomo-linux-${BIN_ARCH}-${LATEST_VERSION}.gz"
+        FILE_NAME="mihomo-linux-${BIN_ARCH}-${LATEST_VERSION}.gz"
     fi
     DOWNLOAD_URL="https://github.com/MetaCubeX/mihomo/releases/download/${LATEST_VERSION}/${FILE_NAME}"
 
-    echo "📦 下载 ${FILE_NAME} ..."
+    echo "[+] 正在下载 ${FILE_NAME}..."
     if ! wget -O /tmp/mihomo.gz "$DOWNLOAD_URL"; then
-        echo "⚠️ 下载 ${LEVEL} 版本失败，尝试兼容版本..."
+        echo "[!] 对应等级的构建下载失败，尝试兼容版本..."
         FILE_NAME="mihomo-linux-${BIN_ARCH}-compatible-${LATEST_VERSION}.gz"
         DOWNLOAD_URL="https://github.com/MetaCubeX/mihomo/releases/download/${LATEST_VERSION}/${FILE_NAME}"
         wget -O /tmp/mihomo.gz "$DOWNLOAD_URL" || {
-            echo "❌ 所有下载方式失败，请检查网络或 GitHub 访问。"
+            echo "[-] 所有下载方式均失败。"
             exit 1
         }
     fi
@@ -149,75 +120,47 @@ if ! command -v mihomo &>/dev/null; then
     gzip -d /tmp/mihomo.gz
     chmod +x /tmp/mihomo
     mv /tmp/mihomo /usr/local/bin/mihomo
-    echo "✅ mihomo 安装完成"
+    echo "[+] mihomo 安装完成。"
 else
-    echo "✅ 已检测到 mihomo，跳过安装步骤"
+    echo "[+] 已检测到 mihomo，跳过安装。"
 fi
 
-# ==========
-# 生成配置与证书
-# ==========
 mkdir -p /root/.config/mihomo/
-echo "🔐 生成新的 SSL 证书..."
+
+echo "[+] 生成 SSL 证书..."
 openssl req -newkey rsa:2048 -nodes \
   -keyout /root/.config/mihomo/server.key \
   -x509 -days 365 \
   -out /root/.config/mihomo/server.crt \
   -subj "/C=US/ST=CA/L=SF/O=$(openssl rand -hex 8)/CN=$(openssl rand -hex 12)"
 
-# ========
-# 生成 reality-keypair
-# ========
-# 使用 mihomo 自带命令生成 Reality 密钥对
+echo "[+] 生成 Reality 密钥对..."
 REALITY_KEYS=$(mihomo generate reality-keypair)
-# 提取 PrivateKey / PublicKey
 PRIVATE_KEY=$(echo "$REALITY_KEYS" | grep PrivateKey | awk '{print $2}')
 PUBLIC_KEY=$(echo "$REALITY_KEYS" | grep PublicKey | awk '{print $2}')
 VLESS_SNI="www.apple.com"
 
+echo "[+] 生成 VLESS 后量子密钥 (mlkem768)..."
+PQ_KEYS=$(mihomo generate vless-mlkem768)
+PQ_SEED=$(echo "$PQ_KEYS" | awk -F': ' '/^Seed:/{print $2}')
+PQ_CLIENT=$(echo "$PQ_KEYS" | awk -F': ' '/^Client:/{print $2}')
+if [ -n "$PQ_SEED" ] && [ -n "$PQ_CLIENT" ]; then
+    VLESS_DECRYPTION="mlkem768x25519plus.native.600s.$PQ_SEED"
+    VLESS_ENCRYPTION="mlkem768x25519plus.native.0rtt.$PQ_CLIENT"
+fi
+# 如果解析失败，使用示例字符串占位，避免空值
+if [ -z "$VLESS_DECRYPTION" ] || [ -z "$VLESS_ENCRYPTION" ]; then
+    echo "[!] 未能解析后量子密钥，使用示例值（请尽快替换为实际生成的密钥）"
+    VLESS_DECRYPTION="mlkem768x25519plus.native.600s.csJ8f1xrtBp09v6_TiKIO_fEhBt6jz7BJ4G1XUBUidfHUrGbaONgZvGkDL-tsuDElGTgTRDsrTOzBWbdX4Mnlw"
+    VLESS_ENCRYPTION="mlkem768x25519plus.native.0rtt.3qdg7VMCRGYf97oh-eRj4iWOIRGJ4IIKa5oAxSud0FpXqkoL85efWOg-4oSQ0HKRd1l_gvmKW_sqgAdiLlA2QCSBMPA9n2MwhOu_7LS87SWROrxkW-OQ-MUcLcVP5VQTHTQBOONdWndpi4cEfIYp2TqarQGnwBUg5LNcSwOTNuMgNWpiyNeSDdkpv3wDRyspCrOhHbI9nxqImRIid6EXDEa5EjmcvJHLAJcUKJQi77hAdRtlgig2AoGnQnhTD5eHSwuS_4ysvfCr-2wlWZMVNUsZx_m4W2lUFpwAWWtYujZTwYwygHqSHgO_l2y0_6w1-ghcnLO8WVQcrdXGiURy2NTOXmkKfaAkEQN6lIgV8xlpzGhC_RFyXtw4uDoqNsIIsWghXRgVfMZy3INe5qZLtcQ5M0JLONbB5hW_cjujsPsXvcm-eIRXxTEUOzkjpKObcTo62hCF_jMAmQCZYvu9kArAdqYjwVi41SwdTTBF2uHEDwlSXCtk7FzKdRpejxiSitdP6SYSYeuXsaxWZKejBSx3RNI-OftU3BG3oSI4SWOUm3mMnyNP7meQc9p7s8tVssY7M6sKSDQdQfSbpPh--ouCrjIda1ixo7ZaGxK4BxRAyRMaHZcQcal5GESXbiy7G9UjD4N0UCLCWzCU_Bh8o5en1eihzZBMHpt6P0dKYXQaI6aYyfpppuuOGsdI5RZBYkll2NISz2lCKmIRR5qHOgUVigV0ApldgPMqYHOLkHctSdtqHgRqgZkG2VjNUQQFfbO9epqilPEtu5OLB3VaOGJwEyAQEQt2LhrJH0t3F3XCMYoauyGGGMF0DdAYPwiHc-wWxQUSrDeWUCdZ3FrGDzEpvfEzrPEUOJKKXPqQHTWKR8PDxbjCuqxr-8qYGJiXnqt_cYohqZdl6jSQ-1WZoId8S1Sz6pYh_kGC4hCSk2S5wwRFvOWNKEHDhCfPmBIX8VdrKowCuKYFQLylxClUwfsRjUozV3J40cqkmKleGtBKP8yepLkgTFmLNRJ4-qIdArN_VaiLyxlbXONT8jAQOsduJHoYB_EumQdFxdB61aOevyxhxncVHOpFf_wXnQuk-AKsPRsCksfC2anCeIFzavuKrOylPWaf03eZOKBRB7KuOeNo42Oru_FA_-DBvukY25XBm9XNWmlW6hhFAoAzambFnvW1PbVUv_uz6jFPLpVzjtSrQuyWjdKUQPKwoKFuNDhxRzdEFrG6ecg9o8wg9Pyk3NyId3TEToAM5hxUPYxkFUoc0eWGwFtX6Iksimahl8xeKfCtzSUkZpk017GCstnIDwAfomVrieKf9lOXQBCNT2ZECZempsQ9oIXAwVgNzvrJFruq44E8bGu_80dEj6ujOEkQllBPPKsw7QBoUExix9yZCVll3zqo_nIgdZQR48QEkxen_WVszDigahUvHPa5wiE2jJZlCAE0thzAwZIf96rH_bk09LZO9kISwqxWa7ab1JMpWmlYAxcOB9gEzIF00pxXBfa0lEWb6ITCDbVf6AeadSdbcPhIS7RjbdcWlJBDBrT-S46HfIcM3lWcgFeAjeyyx8raG8MaMN2rwQA"
+fi
 
-
-
-HY2_PASSWORD=$(uuidgen)
-ANYTLS_PASSWORD=$(uuidgen)
 VLESS_PASSWORD=$(uuidgen)
 SHORT_ID=$(openssl rand -hex 8)
-HY2_PORT=$(random_free_port)
-
-# 确保 ANYTLS_PORT 不等于 HY2_PORT
-while true; do
-    ANYTLS_PORT=$(random_free_port)
-    [ "$ANYTLS_PORT" -ne "$HY2_PORT" ] && break
-done
-
-# 确保 VLESS_PORT 不等于前两个
-while true; do
-    VLESS_PORT=$(random_free_port)
-    if [ "$VLESS_PORT" -ne "$HY2_PORT" ] && [ "$VLESS_PORT" -ne "$ANYTLS_PORT" ]; then
-        break
-    fi
-done
-
-
+VLESS_PORT=$(random_free_port)
 
 cat > /root/.config/mihomo/config.yaml <<EOF
 listeners:
-- name: anytls-in-1
-  type: anytls
-  port: $ANYTLS_PORT
-  listen: 0.0.0.0
-  users:
-    username1: '$ANYTLS_PASSWORD'
-  certificate: ./server.crt
-  private-key: ./server.key
-- name: hy2
-  type: hysteria2
-  port: $HY2_PORT
-  listen: 0.0.0.0
-  users:
-    user1: $HY2_PASSWORD
-  certificate: ./server.crt
-  private-key: ./server.key
 - name: vless-reality
   type: vless
   port: $VLESS_PORT
@@ -231,6 +174,7 @@ listeners:
   network: tcp
   udp: true
   packet-encoding: xudp
+  decryption: "$VLESS_DECRYPTION"
   reality-config:
     dest: "$VLESS_SNI:443"
     private-key: "$PRIVATE_KEY"
@@ -240,9 +184,6 @@ listeners:
       - "$VLESS_SNI"
 EOF
 
-# ==========
-# 创建 systemd 服务
-# ==========
 cat > /etc/systemd/system/mihomo.service <<EOF
 [Unit]
 Description=Mihomo Service
@@ -264,41 +205,16 @@ EOF
 
 systemctl daemon-reload
 systemctl enable --now mihomo.service || {
-    echo "⚠️ 服务启动失败，请运行: journalctl -u mihomo -xe"
+    echo "[!] 服务启动失败，请运行: journalctl -u mihomo -xe"
 }
 
-PUBLIC_IP=$(curl -4 -s ifconfig.me || echo "你的公网IP")
-# 输出客户端配置
-echo -e "\n\n新的客户端配置信息："
-echo "=============================================="
-echo "1. Hysteria2 客户端配置:"
-echo -e "\n- name: $PUBLIC_IP｜Direct｜hy2"
-echo "  type: hysteria2"
-echo "  server: $PUBLIC_IP"
-echo "  port: $HY2_PORT"
-echo "  password: '$HY2_PASSWORD'"
-echo "  udp: true"
-echo "  sni: bing.com"
-echo "  skip-cert-verify: true"
+PUBLIC_IP=$(curl -4 -s ifconfig.me || echo "YOUR_PUBLIC_IP")
 
-echo -e "\n2. AnyTLS 客户端配置:"
-echo -e "\n- name: $PUBLIC_IP｜Direct｜anytls"
-echo "  server: $PUBLIC_IP"
-echo "  type: anytls"
-echo "  port: $ANYTLS_PORT"
-echo "  password: $ANYTLS_PASSWORD"
-echo "  skip-cert-verify: true"
-echo "  sni: www.usavps.com"
-echo "  udp: true"
-echo "  tfo: true"
-echo "  tls: true"
-echo "  client-fingerprint: chrome"
+echo "\nVLESS Reality 客户端配置 (含后量子加密):"
 echo "=============================================="
-
-echo -e "\n3. Vless Reality 客户端配置:"
-echo -e "\n- name: $PUBLIC_IP｜Direct｜vless"
-echo "  server: $PUBLIC_IP"
+echo "- name: ${PUBLIC_IP}|Direct|vless"
 echo "  type: vless"
+echo "  server: $PUBLIC_IP"
 echo "  port: $VLESS_PORT"
 echo "  uuid: $VLESS_PASSWORD"
 echo "  flow: xtls-rprx-vision"
@@ -308,31 +224,19 @@ echo "  client-fingerprint: chrome"
 echo "  network: tcp"
 echo "  udp: true"
 echo "  packet-encoding: xudp"
+echo "  encryption: \"$VLESS_ENCRYPTION\"  # 出站（客户端）使用"
 echo "  reality-opts:"
 echo "    public-key: \"$PUBLIC_KEY\""
 echo "    short-id: \"$SHORT_ID\""
+echo "=============================================="
 
-
-
+echo "vless://$VLESS_PASSWORD@$PUBLIC_IP:$VLESS_PORT?security=reality&flow=xtls-rprx-vision&pbk=$PUBLIC_KEY&sni=$VLESS_SNI&fp=chrome&sid=$SHORT_ID&type=tcp&flow=xtls-rprx-vision&encryption=$VLESS_ENCRYPTION#${PUBLIC_IP}|Direct|vless"
+echo "=============================================="
 echo -e "\nCompact 格式配置（可直接粘贴到 Mihomo proxies 列表中）:"
-echo "----------------------------------------------"
-echo "- {name: \"$PUBLIC_IP｜Direct｜anytls\", type: anytls, server: $PUBLIC_IP, port: $ANYTLS_PORT, password: \"$ANYTLS_PASSWORD\", skip-cert-verify: true, sni: www.usavps.com, udp: true, tfo: true, tls: true, client-fingerprint: chrome}"
-echo "- {name: \"$PUBLIC_IP｜Direct｜hy2\", type: hysteria2, server: $PUBLIC_IP, port: $HY2_PORT, password: \"$HY2_PASSWORD\", udp: true, sni: bing.com, skip-cert-verify: true}"
-echo "- {name: \"$PUBLIC_IP｜Direct｜vless\", type: vless, server: $PUBLIC_IP, port: $VLESS_PORT, uuid: \"$VLESS_PASSWORD\", flow: xtls-rprx-vision, tls: true, servername: $VLESS_SNI, skip-cert-verify: true,network: tcp,udp: true, client-fingerprint: chrome,packet-encoding: xudp, reality-opts: {public-key: \"$PUBLIC_KEY\", short-id: \"$SHORT_ID\"}}"
-echo "----------------------------------------------"
-
-
-
-echo "hysteria2://$HY2_PASSWORD@$PUBLIC_IP:$HY2_PORT?peer=bing.com&insecure=1#$PUBLIC_IP｜Direct｜hy2"
-
-echo "anytls://$ANYTLS_PASSWORD@$PUBLIC_IP:$ANYTLS_PORT?peer=www.usavps.com&insecure=1&fastopen=1&udp=1#$PUBLIC_IP｜Direct｜anytls"
-
-echo "vless://$VLESS_PASSWORD@$PUBLIC_IP:$VLESS_PORT?security=reality&flow=xtls-rprx-vision&pbk=$PUBLIC_KEY&sni=$VLESS_SNI&fp=chrome&sid=$SHORT_ID&type=tcp&flow=xtls-rprx-vision#$PUBLIC_IP｜Direct｜vless"
+echo "- {name: \"$PUBLIC_IP|Direct|vless\", type: vless, server: $PUBLIC_IP, port: $VLESS_PORT, uuid: "$VLESS_PASSWORD", flow: xtls-rprx-vision, tls: true, servername: $VLESS_SNI, skip-cert-verify: true, network: tcp, udp: true, packet-encoding: xudp, decryption: "$VLESS_DECRYPTION", encryption: "$VLESS_ENCRYPTION", reality-opts: {public-key: "$PUBLIC_KEY", short-id: "$SHORT_ID"}}"
 
 
 systemctl restart mihomo.service
 
 echo -e "\n服务状态:"
-
 systemctl status mihomo --no-pager -l
-

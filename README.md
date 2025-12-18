@@ -23,3 +23,12 @@ bash <(curl -fsSL https://github.com/iahfdoa/mihomo-scripts/releases/latest/down
 ```
 
 
+
+📌 **vless一键安装命令**
+
+- 无需证书、无需任何提前准备，内置 Reality
+- 默认启用 后量子抗量子算法（mlkem768 x25519plus），入站/出站密钥自动生成
+
+```bash
+bash <(curl -fsSL https://github.com/iahfdoa/mihomo-scripts/releases/latest/download/install-vless.sh)
+```
