@@ -16,11 +16,11 @@ rm -f /usr/local/bin/mihomo
 
 # 删除配置文件和证书
 echo "删除配置目录..."
-rm -rf /root/.config/mihomo
+rm -rf $HOME/.config/mihomo
 
 # 检查是否完全卸载
 echo -e "\n卸载完成，检查残留文件："
-if [[ -f /usr/local/bin/mihomo || -d /root/.config/mihomo ]]; then
+if [[ -f /usr/local/bin/mihomo || -d $HOME/.config/mihomo ]]; then
     echo "警告：以下文件未被删除："
     [[ -f /usr/local/bin/mihomo ]] && echo "  /usr/local/bin/mihomo"
     [[ -d /root/.config/mihomo ]] && echo "  /root/.config/mihomo/"

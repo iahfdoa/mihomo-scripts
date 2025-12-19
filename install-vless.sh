@@ -125,13 +125,13 @@ else
     echo "[+] 已检测到 mihomo，跳过安装。"
 fi
 
-mkdir -p /root/.config/mihomo/
+mkdir -p $HOME/.config/mihomo/
 
 echo "[+] 生成 SSL 证书..."
 openssl req -newkey rsa:2048 -nodes \
-  -keyout /root/.config/mihomo/server.key \
+  -keyout $HOME/.config/mihomo/server.key \
   -x509 -days 365 \
-  -out /root/.config/mihomo/server.crt \
+  -out $HOME/.config/mihomo/server.crt \
   -subj "/C=US/ST=CA/L=SF/O=$(openssl rand -hex 8)/CN=$(openssl rand -hex 12)"
 
 echo "[+] 生成 Reality 密钥对..."
@@ -159,7 +159,7 @@ VLESS_PASSWORD=$(uuidgen)
 SHORT_ID=$(openssl rand -hex 8)
 VLESS_PORT=$(random_free_port)
 
-cat > /root/.config/mihomo/config.yaml <<EOF
+cat > $HOME/.config/mihomo/config.yaml <<EOF
 listeners:
 - name: vless-reality
   type: vless

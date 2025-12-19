@@ -28,7 +28,11 @@ jobs:
             echo "❌ uninstall.sh not found"
             exit 1
           fi
-          chmod +x install.sh uninstall.sh install-all.sh
+          if [ ! -f "install-vless.sh" ]; then
+            echo "❌ uninstall.sh not found"
+            exit 1
+          fi
+          chmod +x install.sh uninstall.sh install-all.sh install-vless.sh
           echo "✅ Scripts verified and made executable"
 
       - name: Create Release with scripts
@@ -41,5 +45,6 @@ jobs:
             install.sh
             install-all.sh
             uninstall.sh
+            install-vless.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

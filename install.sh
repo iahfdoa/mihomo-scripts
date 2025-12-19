@@ -136,12 +136,12 @@ fi
 # ==========
 # 生成配置与证书
 # ==========
-mkdir -p /root/.config/mihomo/
+mkdir -p $HOME/.config/mihomo/
 echo "🔐 生成新的 SSL 证书..."
 openssl req -newkey rsa:2048 -nodes \
-  -keyout /root/.config/mihomo/server.key \
+  -keyout $HOME/.config/mihomo/server.key \
   -x509 -days 365 \
-  -out /root/.config/mihomo/server.crt \
+  -out $HOME/.config/mihomo/server.crt \
   -subj "/C=US/ST=CA/L=SF/O=$(openssl rand -hex 8)/CN=$(openssl rand -hex 12)"
 
 HY2_PASSWORD=$(uuidgen)
@@ -152,7 +152,7 @@ while [ "$HY2_PORT" -eq "$ANYTLS_PORT" ]; do
     ANYTLS_PORT=$((RANDOM % 40001 + 20000))
 done
 
-cat > /root/.config/mihomo/config.yaml <<EOF
+cat > $HOME/.config/mihomo/config.yaml <<EOF
 listeners:
 - name: anytls-in-1
   type: anytls
